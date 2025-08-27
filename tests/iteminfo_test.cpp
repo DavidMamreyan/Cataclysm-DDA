@@ -1830,7 +1830,7 @@ TEST_CASE( "gun_or_other_ranged_weapon_attributes", "[iteminfo][weapon][gun]" )
 
         CHECK( item_info_str( glock, recoil ) ==
                "--\n"
-               "Effective recoil: <color_c_yellow>312</color>\n" );
+               "Effective recoil: <color_c_yellow>3.12</color> MOA\n" );
     }
 
     SECTION( "gun type and current magazine" ) {
@@ -1921,7 +1921,7 @@ TEST_CASE( "gun_or_other_ranged_weapon_attributes", "[iteminfo][weapon][gun]" )
     SECTION( "weapon dispersion" ) {
         CHECK( item_info_str( compbow, { iteminfo_parts::GUN_DISPERSION } ) ==
                "--\n"
-               "Dispersion: <color_c_yellow>850</color>\n" );
+               "Dispersion: <color_c_yellow>8.50</color>\n" );
     }
 
     SECTION( "needing two hands to fire" ) {
@@ -1963,15 +1963,15 @@ TEST_CASE( "gun_armor_piercing_dispersion_and_other_stats", "[iteminfo][gun][mis
            "--\n = <color_c_yellow>0</color>\n" );
 
     CHECK( item_info_str( glock, disp_loaded ) ==
-           "--\n<color_c_yellow>+60</color>\n" );
+           "--\n<color_c_yellow>+0.60</color>\n" );
     CHECK( item_info_str( glock, disp_total ) ==
-           "--\n = <color_c_yellow>540</color>\n" );
+           "--\n = <color_c_yellow>5.40</color> MOA\n" );
 
     CHECK( item_info_str( glock, disp_sight ) ==
            "--\n"
-           "Sight dispersion: <color_c_yellow>30</color>"
-           "<color_c_yellow>+14</color>"
-           " = <color_c_yellow>44</color>\n" );
+           "Sight dispersion: <color_c_yellow>0.30</color>"
+           "<color_c_yellow>+0.14</color>"
+           " = <color_c_yellow>0.44</color> MOA\n" );
 
     // TODO: Add a test gun with thest attributes
     //CHECK( item_info_str( glock, recoil_bipod ).empty() );
@@ -2045,7 +2045,7 @@ TEST_CASE( "gunmod_info", "[iteminfo][gunmod]" )
 
     CHECK( item_info_str( supp, disp_sight ) ==
            "--\n"
-           "Sight dispersion: <color_c_yellow>11</color>\n" );
+           "Sight dispersion: <color_c_yellow>0.11</color> MOA\n" );
 
     CHECK( item_info_str( supp, field_of_view ) ==
            "--\n"
@@ -2100,8 +2100,8 @@ TEST_CASE( "ammunition", "[iteminfo][ammo]" )
                "--\n"
                "<color_c_white>Ammunition type</color>: rocks\n"
                "Damage: <color_c_yellow>7</color>  Armor-pierce: <color_c_yellow>0</color>\n"
-               "Range: <color_c_yellow>10</color>  Dispersion: <color_c_yellow>14</color>\n"
-               "Recoil: <color_c_yellow>0</color>  Critical multiplier: <color_c_yellow>2</color>\n" );
+               "Range: <color_c_yellow>10</color>  Dispersion: <color_c_yellow>0.14</color> MOA\n"
+               "Recoil: <color_c_yellow>0.00</color> MOA  Critical multiplier: <color_c_yellow>2</color>\n" );
     }
 
     SECTION( "batteries" ) {
