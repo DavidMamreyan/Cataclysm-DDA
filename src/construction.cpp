@@ -507,6 +507,12 @@ construction_id construction_menu( const bool blueprint )
     std::map<construction_category_id, std::vector<construction_group_str_id>> cat_available;
     load_available_constructions( available, cat_available, filter_mode );
 
+    // Do not trap the menu in a remembered mode that currently has no matches.
+    if( available.empty() && filter_mode != 0 ) {
+        filter_mode = 0;
+        load_available_constructions( available, cat_available, filter_mode );
+    }
+
     if( available.empty() ) {
         popup( _( "You can not construct anything here." ) );
         return construction_id( -1 );
