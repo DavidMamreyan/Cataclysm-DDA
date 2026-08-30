@@ -881,9 +881,22 @@ int monster::print_info( const catacurses::window &w, int vStart, int vLines, in
     }
 
     // Difficulty indicator in the third line.
-    const std::string difficulty_str = debug_mode ?
-                                       _( "Difficulty " ) + std::to_string( type->get_total_difficulty() ) :
-                                       type->get_difficulty_description();
+    std::string difficulty_str;
+    if( debug_mode ) {
+        difficulty_str = _( "Difficulty " ) + std::to_string( type->difficulty );
+    } else if( type->difficulty < 3 ) {
+        difficulty_str = _( "<color_light_gray>Minimal threat.</color>" );
+    } else if( type->difficulty < 10 ) {
+        difficulty_str = _( "<color_light_gray>Mildly dangerous.</color>" );
+    } else if( type->difficulty < 20 ) {
+        difficulty_str = _( "<color_light_red>Dangerous.</color>" );
+    } else if( type->difficulty < 30 ) {
+        difficulty_str = _( "<color_red>Very dangerous.</color>" );
+    } else if( type->difficulty < 50 ) {
+        difficulty_str = _( "<color_red>Extremely dangerous.</color>" );
+    } else {
+        difficulty_str = _( "<color_red>Fatally dangerous!</color>" );
+    }
     vStart += fold_and_print( w, point( column, vStart ), max_width, c_white, difficulty_str );
 
     // Awareness indicator in the fourth line.
