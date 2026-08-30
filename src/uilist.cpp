@@ -65,6 +65,10 @@ class uilist_impl : cataimgui::window
 void uilist_impl::draw_controls()
 {
 #if defined(TILES)
+    if( parent.hide_ui ) {
+        ImGuiWindow *w = ImGui::GetCurrentWindowRead();
+        ImGui::SetWindowHiddenAndSkipItemsForCurrentFrame( w );
+    }
     using cata::options::mouse;
     bool cursor_shown = SDL_ShowCursor( SDL_QUERY ) == SDL_ENABLE;
     if( mouse.hidekb && !cursor_shown ) {
@@ -1034,6 +1038,13 @@ void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
 }
 
 ///@}
+#if defined(TILES)
+void uilist::set_hide( const bool val )
+{
+    hide_ui = val;
+}
+#endif
+
 /**
  * cleanup
  */
