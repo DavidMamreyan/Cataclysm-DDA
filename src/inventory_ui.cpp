@@ -4318,6 +4318,7 @@ static item_location get_item_to_highlight_after_use( inventory_column &column,
         const item_location &loc )
 {
     bool found = false;
+    item_location previous = item_location::nowhere;
     for( const inventory_entry *entry : column.get_entries( return_item ) ) {
         for( const item_location &entry_loc : entry->locations ) {
             if( found ) {
@@ -4325,10 +4326,12 @@ static item_location get_item_to_highlight_after_use( inventory_column &column,
             }
             if( entry_loc == loc ) {
                 found = true;
+            } else {
+                previous = entry_loc;
             }
         }
     }
-    return item_location::nowhere;
+    return found ? previous : item_location::nowhere;
 }
 
 bool pickup_selector::wield( int &count )
