@@ -1154,9 +1154,12 @@ static void draw_om_sidebar( ui_adaptor &ui,
     if( has_target ) {
         const int distance = rl_dist( cursor_pos, target );
         mvwprintw( wbar, point( 1, ++lines ), _( "Distance to current objective:" ) );
-        mvwprintw( wbar, point( 1, ++lines ), _( "%d tiles" ), distance );
         // One OMT is 24 tiles across, at 1x1 meters each, so we can simply do number of OMTs * 24
-        mvwprintw( wbar, point( 1, ++lines ), _( "%s" ), length_to_string_approx( distance * 24_meter ) );
+        const units::length actual_distance = distance * 24_meter;
+        const std::string dir_arrow = direction_arrow( direction_from( cursor_pos.xy(), target.xy() ) );
+        //~ Parentheses contain the real-world distance, for example: "223 tiles (5.35 km) NE arrow"
+        mvwprintw( wbar, point( 1, ++lines ), _( "%1$d tiles (%2$s) %3$s" ), distance,
+                   length_to_string_approx( actual_distance ), dir_arrow );
 
         const int above_below = target.z() - orig.z();
         std::string msg;
