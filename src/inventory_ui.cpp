@@ -4314,6 +4314,23 @@ drop_locations pickup_selector::execute()
     return dropped_pos_and_qty;
 }
 
+static item_location get_item_to_highlight_after_use( inventory_column &column,
+        const item_location &loc )
+{
+    bool found = false;
+    for( const inventory_entry *entry : column.get_entries( return_item ) ) {
+        for( const item_location &entry_loc : entry->locations ) {
+            if( found ) {
+                return entry_loc;
+            }
+            if( entry_loc == loc ) {
+                found = true;
+            }
+        }
+    }
+    return item_location::nowhere;
+}
+
 bool pickup_selector::wield( int &count )
 {
     inventory_entry &selected = get_active_column().get_highlighted();
@@ -4329,7 +4346,8 @@ bool pickup_selector::wield( int &count )
 
     if( u.can_wield( *it ).success() ) {
         remove_from_to_use( it );
-        reopen_menu();
+        const item_location next_item = get_item_to_highlight_after_use( get_active_column(), it );
+        reopen_menu( next_item );
         u.assign_activity( wield_activity_actor( it, charges ) );
         return true;
     } else {
@@ -4351,7 +4369,9 @@ bool pickup_selector::wear()
 
     if( u.can_wear( *items.front() ).success() ) {
         remove_from_to_use( items.front() );
-        reopen_menu();
+        const item_location next_item = get_item_to_highlight_after_use( get_active_column(),
+                                        items.front() );
+        reopen_menu( next_item );
         u.assign_activity( wear_activity_actor( items, quantities ) );
         return true;
     } else {
@@ -4361,15 +4381,15 @@ bool pickup_selector::wear()
     return false;
 }
 
-void pickup_selector::reopen_menu()
+void pickup_selector::reopen_menu( const item_location &next_item )
 {
     // copy the member variables to still be valid on call
-    uistate.open_menu = [where = where, to_use = to_use]() {
+    uistate.open_menu = [where = where, to_use = to_use, next_item]() {
         std::optional<tripoint_bub_ms> temp;
         if( where.has_value() ) {
             temp = tripoint_bub_ms( where.value() );
         }
-        get_player_character().pick_up( game_menus::inv::pickup( temp, to_use ) );
+        get_player_character().pick_up( game_menus::inv::pickup( temp, to_use, next_item ) );
     };
 }
 

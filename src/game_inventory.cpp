@@ -2423,7 +2423,8 @@ drop_locations game_menus::inv::multidrop( Character &you )
 }
 
 drop_locations game_menus::inv::pickup( const std::optional<tripoint_bub_ms> &target,
-                                        const std::vector<drop_location> &selection )
+                                         const std::vector<drop_location> &selection,
+                                         const item_location &highlight )
 {
     avatar &you = get_avatar();
     pickup_inventory_preset preset( you, /*skip_wield_check=*/true, /*ignore_liquidcont=*/true );
@@ -2451,6 +2452,11 @@ drop_locations game_menus::inv::pickup( const std::optional<tripoint_bub_ms> &ta
 
     if( !selection.empty() ) {
         pick_s.apply_selection( selection );
+    }
+
+    if( highlight ) {
+        // highlight_one_of also prepares the layout, keeping the item's visual position stable.
+        pick_s.highlight_one_of( { highlight } );
     }
 
     return pick_s.execute();
