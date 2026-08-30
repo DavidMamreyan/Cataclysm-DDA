@@ -399,6 +399,10 @@ class uilist // NOLINT(cata-xy)
 
         void reset();
 
+#if defined(TILES)
+        void set_hide( bool val );
+#endif
+
         shared_ptr_fast<uilist_impl> create_or_get_ui();
         // NOLINTNEXTLINE(google-explicit-constructor)
         operator int() const;
@@ -488,6 +492,9 @@ class uilist // NOLINT(cata-xy)
         bool recalc_start = false;
         bool clicked = false;
         bool need_to_scroll = false;
+#if defined(TILES)
+        bool hide_ui = false;
+#endif
         std::vector<std::pair<std::string, std::string>> categories;
         std::function<bool( const uilist_entry &, const std::string & )> category_filter;
         size_t current_category = 0;

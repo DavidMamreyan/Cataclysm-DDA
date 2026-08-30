@@ -2390,6 +2390,9 @@ int game::inventory_item_menu( item_location locThisItem,
                 ui = nullptr;
             }
 
+#if defined(TILES)
+            action_menu.set_hide( true );
+#endif
             switch( cMenu ) {
                 case 'a': {
                     contents_change_handler handler;
@@ -2536,6 +2539,9 @@ int game::inventory_item_menu( item_location locThisItem,
                 default:
                     break;
             }
+#if defined(TILES)
+            action_menu.set_hide( false );
+#endif
         } while( !exit );
     }
     return cMenu;
