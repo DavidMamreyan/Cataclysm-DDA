@@ -253,13 +253,16 @@ void mission_ui_impl::draw_controls()
 
     if( ( selected_tab != mission_ui_tab_enum::POINTS_OF_INTEREST && umissions.empty() ) ||
         ( selected_tab == mission_ui_tab_enum::POINTS_OF_INTEREST && upoints_of_interest.empty() ) ) {
-        static const std::map< mission_ui_tab_enum, std::string > nope = {
-            { mission_ui_tab_enum::ACTIVE, translate_marker( "You have no active missions!" ) },
-            { mission_ui_tab_enum::COMPLETED, translate_marker( "You haven't completed any missions!" ) },
-            { mission_ui_tab_enum::FAILED, translate_marker( "You haven't failed any missions!" ) },
-            {mission_ui_tab_enum::POINTS_OF_INTEREST, translate_marker( "You don't have any points of interest.  Add those from the overmap." )}
+        static const std::map< mission_ui_tab_enum, translation > nope = {
+            { mission_ui_tab_enum::ACTIVE, to_translation( "You have no active missions!" ) },
+            { mission_ui_tab_enum::COMPLETED,
+              to_translation( "You haven't completed any missions!" ) },
+            { mission_ui_tab_enum::FAILED, to_translation( "You haven't failed any missions!" ) },
+            { mission_ui_tab_enum::POINTS_OF_INTEREST,
+              to_translation(
+                  "You don't have any points of interest.  Add those from the overmap." ) }
         };
-        ImGui::TextWrapped( "%s", nope.at( selected_tab ).c_str() );
+        ImGui::TextWrapped( "%s", nope.at( selected_tab ).translated().c_str() );
         return;
     }
 
