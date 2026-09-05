@@ -8,6 +8,8 @@
 #include "output.h"
 #include "point.h"
 
+void draw_item_info_controls( const item_info_data &data, cataimgui::scroll &scroll );
+
 class iteminfo_window : public cataimgui::window
 {
     public:

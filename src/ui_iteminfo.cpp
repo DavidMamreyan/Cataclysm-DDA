@@ -44,9 +44,9 @@ cataimgui::bounds iteminfo_window::get_bounds()
              static_cast<float>( str_height_to_pixels( height ) ) };
 }
 
-void iteminfo_window::draw_controls()
+void draw_item_info_controls( const item_info_data &data, cataimgui::scroll &scroll )
 {
-    cataimgui::set_scroll( s );
+    cataimgui::set_scroll( scroll );
 
     nc_color base_color = c_light_gray;
     if( !data.get_item_name().empty() ) {
@@ -59,6 +59,11 @@ void iteminfo_window::draw_controls()
     }
 
     display_item_info( data.get_item_display(), data.get_item_compare() );
+}
+
+void iteminfo_window::draw_controls()
+{
+    draw_item_info_controls( data, s );
 }
 
 void iteminfo_window::execute()

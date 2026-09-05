@@ -199,6 +199,7 @@
 #include "trap.h"
 #include "uilist.h"
 #include "ui_extended_description.h"
+#include "ui_iteminfo.h"
 #include "ui_manager.h"
 #include "uistate.h"
 #include "units.h"
@@ -2217,8 +2218,91 @@ static hint_rating rate_action_insert( const avatar &you, const item_location &l
     return hint_rating::good;
 }
 
+class inventory_item_menu_callback final : public uilist_callback
+{
+    public:
+        inventory_item_menu_callback( const item_info_data &data,
+                                       const std::function<int()> &info_width,
+                                       const game::inventory_item_menu_position position,
+                                       bool &item_info_focused, std::string focus_key ) :
+            data( data ), info_width( info_width ), position( position ),
+            item_info_focused( item_info_focused ), focus_key( std::move( focus_key ) ) {}
+
+        bool key( const input_context &ctxt, const input_event &event, int, uilist * ) override {
+            const std::string &action = ctxt.input_to_action( event );
+            if( action == "NEXT_TAB" || action == "PREV_TAB" ) {
+                item_info_focused = !item_info_focused;
+                return true;
+            }
+
+            const bool navigation = action == "UILIST.UP" || action == "UILIST.DOWN" ||
+                                    action == "PAGE_UP" || action == "PAGE_DOWN" ||
+                                    action == "HOME" || action == "END";
+            if( !item_info_focused && navigation ) {
+                return false;
+            }
+
+            if( action == "UILIST.UP" ) {
+                scroll = cataimgui::scroll::line_up;
+            } else if( action == "UILIST.DOWN" ) {
+                scroll = cataimgui::scroll::line_down;
+            } else if( action == "PAGE_UP" ) {
+                scroll = cataimgui::scroll::page_up;
+            } else if( action == "PAGE_DOWN" ) {
+                scroll = cataimgui::scroll::page_down;
+            } else if( action == "HOME" ) {
+                scroll = cataimgui::scroll::begin;
+            } else if( action == "END" ) {
+                scroll = cataimgui::scroll::end;
+            } else {
+                return false;
+            }
+            return true;
+        }
+
+        float desired_extra_space_left() override {
+            return info_on_left() ? desired_info_width() : 0.0f;
+        }
+
+        float desired_extra_space_right() override {
+            return info_on_left() ? 0.0f : desired_info_width();
+        }
+
+        void refresh( uilist * ) override {
+            ImGui::TableSetColumnIndex( info_on_left() ? 0 : 2 );
+            const ImVec2 available = ImGui::GetContentRegionAvail();
+            if( ImGui::BeginChild( "item info", available, ImGuiChildFlags_Borders ) ) {
+                const std::string focus_status = item_info_focused ?
+                                                 string_format( _( "[%s] Item information focused" ), focus_key ) :
+                                                 string_format( _( "[%s] Actions focused" ), focus_key );
+                cataimgui::draw_colored_text( focus_status,
+                                              item_info_focused ? c_light_green : c_dark_gray );
+                ImGui::Separator();
+                draw_item_info_controls( data, scroll );
+            }
+            ImGui::EndChild();
+        }
+
+    private:
+        bool info_on_left() const {
+            return position == game::RIGHT_OF_INFO || position == game::LEFT_TERMINAL_EDGE;
+        }
+
+        float desired_info_width() const {
+            return std::max( 0.0f, info_width() * ImGui::CalcTextSize( "X" ).x -
+                             ImGui::GetStyle().FramePadding.x );
+        }
+
+        const item_info_data &data;
+        const std::function<int()> &info_width;
+        game::inventory_item_menu_position position;
+        cataimgui::scroll scroll = cataimgui::scroll::none;
+        bool &item_info_focused;
+        std::string focus_key;
+};
+
 /* item submenu for 'i' and '/'
-* It use draw_item_info to draw item info and action menu
+ * It uses an ImGui uilist with embedded item info.
 *
 * @param locThisItem the item
 * @param iStartX Left coordinate of the item info window
@@ -2228,7 +2312,7 @@ static hint_rating rate_action_insert( const avatar &you, const item_location &l
 int game::inventory_item_menu( item_location locThisItem,
                                const std::function<int()> &iStartX,
                                const std::function<int()> &iWidth,
-                               UNUSED const inventory_item_menu_position position )
+                               const inventory_item_menu_position position )
 {
     int cMenu = static_cast<int>( '+' );
 
@@ -2243,15 +2327,13 @@ int game::inventory_item_menu( item_location locThisItem,
         std::vector<iteminfo> vThisItem;
         std::vector<iteminfo> vDummy;
         item_info_data data;
-        int iScrollPos = 0;
-        int iScrollHeight = 0;
         uilist action_menu;
-        std::unique_ptr<ui_adaptor> ui;
+        std::unique_ptr<inventory_item_menu_callback> item_info_callback;
+        bool item_info_focused = true;
 
         bool exit = false;
         bool first_execution = true;
         static int lang_version = detail::get_current_language_version();
-        catacurses::window w_info;
         do {
             //lang check here is needed to redraw the menu when using "Toggle language to English" option
             if( first_execution || lang_version != detail::get_current_language_version() ) {
@@ -2261,9 +2343,7 @@ int game::inventory_item_menu( item_location locThisItem,
                                                    hint_rating::cant : hint_rating::good;
                 action_menu.reset();
                 action_menu.allow_anykey = true;
-                float popup_width = 0.0;
                 const auto addentry = [&]( const char key, const std::string & text, const hint_rating hint ) {
-                    popup_width = std::max( popup_width, ImGui::CalcTextSize( text.c_str() ).x );
                     // The char is used as retval from the uilist *and* as hotkey.
                     action_menu.addentry( key, true, key, text );
                     auto &entry = action_menu.entries.back();
@@ -2320,44 +2400,44 @@ int game::inventory_item_menu( item_location locThisItem,
 
                 oThisItem.info( true, vThisItem );
 
-                popup_width += ImGui::CalcTextSize( " [X] " ).x + 2 * ( ImGui::GetStyle().WindowPadding.x +
-                               ImGui::GetStyle().WindowBorderSize );
-                float x = 0.0;
-                switch( position ) {
-                    default:
-                    case RIGHT_TERMINAL_EDGE:
-                        x = 0.0;
-                        break;
-                    case LEFT_OF_INFO:
-                        x = ( iStartX() * ImGui::CalcTextSize( "X" ).x ) - popup_width;
-                        break;
-                    case RIGHT_OF_INFO:
-                        x = ( iStartX() + iWidth() ) * ImGui::CalcTextSize( "X" ).x;
-                        break;
-                    case LEFT_TERMINAL_EDGE:
-                        x = ImGui::GetMainViewport()->Size.x - popup_width;
-                        break;
-                }
-                action_menu.desired_bounds = { x, 0.0, popup_width, -1.0 };
                 // Filtering isn't needed, the number of entries is manageable.
                 action_menu.filtering = false;
                 // Default menu border color is different, this matches the border of the item info window.
                 action_menu.border_color = BORDER_COLOR;
 
-                data = item_info_data( oThisItem.tname(), oThisItem.type_name(), vThisItem, vDummy, iScrollPos );
-                data.without_getch = true;
-
-                ui = std::make_unique<ui_adaptor>();
-                ui->on_screen_resize( [&]( ui_adaptor & ui ) {
-                    w_info = catacurses::newwin( TERMY, iWidth(), point( iStartX(), 0 ) );
-                    iScrollHeight = TERMY - 2;
-                    ui.position_from_window( w_info );
-                } );
-                ui->mark_resize();
-
-                ui->on_redraw( [&]( const ui_adaptor & ) {
-                    draw_item_info( w_info, data );
-                } );
+                data = item_info_data( oThisItem.tname(), oThisItem.type_name(), vThisItem, vDummy );
+                input_context focus_context( action_menu.input_category, keyboard_mode::keycode );
+                focus_context.register_action( "NEXT_TAB" );
+                item_info_callback = std::make_unique<inventory_item_menu_callback>(
+                                         data, iWidth, position, item_info_focused,
+                                         focus_context.get_desc( "NEXT_TAB", 1 ) );
+                action_menu.callback = item_info_callback.get();
+                action_menu.callback_actions = { "UILIST.UP", "UILIST.DOWN", "PAGE_UP", "PAGE_DOWN",
+                                                 "HOME", "END", "NEXT_TAB", "PREV_TAB" };
+                action_menu.bounds_callback = [&]( const cataimgui::bounds & calculated ) {
+                    const float cell_width = ImGui::CalcTextSize( "X" ).x;
+                    const float info_start = iStartX() * cell_width;
+                    const float info_width = iWidth() * cell_width;
+                    float x = 0.0f;
+                    switch( position ) {
+                        default:
+                        case RIGHT_TERMINAL_EDGE:
+                            break;
+                        case LEFT_OF_INFO:
+                            x = info_start - ( calculated.w - info_width );
+                            break;
+                        case RIGHT_OF_INFO:
+                            x = info_start;
+                            break;
+                        case LEFT_TERMINAL_EDGE:
+                            x = ImGui::GetMainViewport()->Size.x - calculated.w;
+                            break;
+                    }
+                    x = std::clamp( x, 0.0f,
+                                    std::max( 0.0f, ImGui::GetMainViewport()->Size.x - calculated.w ) );
+                    return cataimgui::bounds { x, 0.0f, calculated.w,
+                                              ImGui::GetMainViewport()->Size.y };
+                };
 
                 action_menu.additional_actions = {
                     { "RIGHT", translation() }
@@ -2367,7 +2447,6 @@ int game::inventory_item_menu( item_location locThisItem,
                 first_execution = false;
             }
 
-            const int prev_selected = action_menu.selected;
             action_menu.query( true );
             if( action_menu.ret >= 0 ) {
                 cMenu = action_menu.ret; /* Remember: hotkey == retval, see addentry above. */
@@ -2375,19 +2454,12 @@ int game::inventory_item_menu( item_location locThisItem,
                 // Simulate KEY_RIGHT == '\n' (confirm currently selected entry) for compatibility with old version.
                 // TODO: ideally this should be done in the uilist, maybe via a callback.
                 cMenu = action_menu.ret = action_menu.entries[action_menu.selected].retval;
-            } else if( action_menu.ret_act == "PAGE_UP" || action_menu.ret_act == "PAGE_DOWN" ) {
-                cMenu = action_menu.ret_act == "PAGE_UP" ? KEY_PPAGE : KEY_NPAGE;
-                // Prevent the menu from scrolling with this key. TODO: Ideally the menu
-                // could be instructed to ignore these two keys instead of scrolling.
-                action_menu.selected = prev_selected;
-                action_menu.fselected = prev_selected;
             } else {
                 cMenu = 0;
             }
 
             if( action_menu.ret != UILIST_WAIT_INPUT && action_menu.ret != UILIST_UNBOUND ) {
                 exit = true;
-                ui = nullptr;
             }
 
 #if defined(TILES)
@@ -2503,18 +2575,6 @@ int game::inventory_item_menu( item_location locThisItem,
                     break;
                 case '=':
                     game_menus::inv::reassign_letter( oThisItem );
-                    break;
-                case KEY_PPAGE:
-                    iScrollPos -= iScrollHeight;
-                    if( ui ) {
-                        ui->invalidate_ui();
-                    }
-                    break;
-                case KEY_NPAGE:
-                    iScrollPos += iScrollHeight;
-                    if( ui ) {
-                        ui->invalidate_ui();
-                    }
                     break;
                 case '+':
                     if( !bHPR ) {

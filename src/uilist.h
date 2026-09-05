@@ -424,6 +424,8 @@ class uilist // NOLINT(cata-xy)
 
         std::string input_category;
         std::vector<std::pair<std::string, translation>> additional_actions;
+        // These actions are offered to the callback before built-in list navigation.
+        std::vector<std::string> callback_actions;
 
         nc_color border_color;
         nc_color text_color;
@@ -435,6 +437,8 @@ class uilist // NOLINT(cata-xy)
         uilist_callback *callback;
 
         std::optional<cataimgui::bounds> desired_bounds;
+        // Recalculate bounds from the content dimensions, for layouts tied to another window.
+        std::function<cataimgui::bounds( const cataimgui::bounds & )> bounds_callback;
         bool desc_enabled = false;
 
         bool filtering = false;

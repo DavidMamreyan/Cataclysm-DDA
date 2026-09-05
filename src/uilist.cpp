@@ -57,7 +57,15 @@ class uilist_impl : cataimgui::window
                 parent.setup();
             }
 
+            if( parent.bounds_callback ) {
+                return parent.bounds_callback( parent.calculated_bounds );
+            }
             return parent.desired_bounds.value_or( parent.calculated_bounds );
+        }
+        void on_resized() override {
+            if( parent.bounds_callback ) {
+                parent.started = false;
+            }
         }
         void draw_controls() override;
 };
@@ -467,6 +475,7 @@ void uilist::init()
 {
     cata_assert( !test_mode ); // uilist should not be used in tests where there's no place for it
     desired_bounds = std::nullopt;
+    bounds_callback = {};
     calculated_bounds = { -1.f, -1.f, -1.f, -1.f };
     calculated_menu_size = { 0.0, 0.0 };
     calculated_hotkey_width = 0.0;
@@ -514,6 +523,7 @@ void uilist::init()
 
     input_category = "UILIST";
     additional_actions.clear();
+    callback_actions.clear();
 }
 
 input_context uilist::create_main_input_context() const
@@ -542,6 +552,9 @@ input_context uilist::create_main_input_context() const
     ctxt.register_action( "HELP_KEYBINDINGS" );
     for( const auto &additional_action : additional_actions ) {
         ctxt.register_action( additional_action.first, additional_action.second );
+    }
+    for( const std::string &callback_action : callback_actions ) {
+        ctxt.register_action( callback_action );
     }
     return ctxt;
 }
@@ -881,7 +894,8 @@ shared_ptr_fast<uilist_impl> uilist::create_or_get_ui()
 void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
 {
 #if defined(__ANDROID__)
-    if( get_option<bool>( "ANDROID_NATIVE_UI" ) && !entries.empty() && !desired_bounds ) {
+    if( get_option<bool>( "ANDROID_NATIVE_UI" ) && !entries.empty() && !desired_bounds &&
+        !bounds_callback && callback == nullptr ) {
         if( !started ) {
             calc_data();
             started = true;
@@ -973,7 +987,15 @@ void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
         const auto iter = keymap.find( ret_evt );
         recalc_start = false;
 
-        if( scrollby( scroll_amount_from_action( ret_act ) ) ) {
+        const bool callback_was_offered = callback != nullptr &&
+                                          std::find( callback_actions.begin(), callback_actions.end(),
+                                                  ret_act ) != callback_actions.end();
+        const bool callback_has_priority = callback_was_offered &&
+                                           callback->key( ctxt, event, selected, this );
+
+        if( callback_has_priority ) {
+            recalc_start = true;
+        } else if( scrollby( scroll_amount_from_action( ret_act ) ) ) {
             need_to_scroll = true;
             recalc_start = true;
         } else if( filtering && ret_act == "UILIST.FILTER" ) {
@@ -1021,7 +1043,8 @@ void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
             ret = UILIST_WAIT_INPUT;
         } else {
             // including HELP_KEYBINDINGS, in case the caller wants to refresh their contents
-            bool unhandled = callback == nullptr || !callback->key( ctxt, event, selected, this );
+            bool unhandled = callback == nullptr || callback_was_offered ||
+                             !callback->key( ctxt, event, selected, this );
             if( unhandled && allow_anykey ) {
                 ret = UILIST_UNBOUND;
             } else if( unhandled && allow_additional ) {
