@@ -2174,6 +2174,7 @@
   {
     "id": "pipe_cleaner",
     "type": "ITEM",
+    "category": "tools",
     "name": { "str": "pipe cleaner" },
     "description": "A tool designed to clean the interior surface of pipes, bottles, and similar objects.  This one is thin enough to be used for cleaning firearm barrels from dirt and fouling.",
     "weight": "50 g",
