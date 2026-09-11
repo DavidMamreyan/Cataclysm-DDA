@@ -2246,9 +2246,9 @@ class inventory_item_menu_callback final : public uilist_callback
                 scroll = cataimgui::scroll::line_up;
             } else if( action == "UILIST.DOWN" ) {
                 scroll = cataimgui::scroll::line_down;
-            } else if( action == "PAGE_UP" ) {
+            } else if( action == "PAGE_UP" || action == "SCROLL_ITEM_INFO_UP" ) {
                 scroll = cataimgui::scroll::page_up;
-            } else if( action == "PAGE_DOWN" ) {
+            } else if( action == "PAGE_DOWN" || action == "SCROLL_ITEM_INFO_DOWN" ) {
                 scroll = cataimgui::scroll::page_down;
             } else if( action == "HOME" ) {
                 scroll = cataimgui::scroll::begin;
@@ -2334,6 +2334,7 @@ int game::inventory_item_menu( item_location locThisItem,
         bool exit = false;
         bool first_execution = true;
         static int lang_version = detail::get_current_language_version();
+        shared_ptr_fast<uilist_impl> ui_impl;
         do {
             //lang check here is needed to redraw the menu when using "Toggle language to English" option
             if( first_execution || lang_version != detail::get_current_language_version() ) {
@@ -2413,7 +2414,8 @@ int game::inventory_item_menu( item_location locThisItem,
                                          focus_context.get_desc( "NEXT_TAB", 1 ) );
                 action_menu.callback = item_info_callback.get();
                 action_menu.callback_actions = { "UILIST.UP", "UILIST.DOWN", "PAGE_UP", "PAGE_DOWN",
-                                                 "HOME", "END", "NEXT_TAB", "PREV_TAB" };
+                                                 "HOME", "END", "NEXT_TAB", "PREV_TAB",
+                                                 "SCROLL_ITEM_INFO_UP", "SCROLL_ITEM_INFO_DOWN" };
                 action_menu.bounds_callback = [&]( const cataimgui::bounds & calculated ) {
                     const float cell_width = ImGui::CalcTextSize( "X" ).x;
                     const float info_start = iStartX() * cell_width;
@@ -2447,7 +2449,7 @@ int game::inventory_item_menu( item_location locThisItem,
                 first_execution = false;
             }
 
-            action_menu.query( true );
+            ui_impl = action_menu.query( false );
             if( action_menu.ret >= 0 ) {
                 cMenu = action_menu.ret; /* Remember: hotkey == retval, see addentry above. */
             } else if( action_menu.ret == UILIST_UNBOUND && action_menu.ret_act == "RIGHT" ) {
@@ -2509,6 +2511,7 @@ int game::inventory_item_menu( item_location locThisItem,
                     }
                     break;
                 case 't': {
+                    ui_impl.reset();
                     contents_change_handler handler;
                     handler.unseal_pocket_containing( locThisItem );
                     avatar_action::plthrow( u, locThisItem );
@@ -2556,20 +2559,24 @@ int game::inventory_item_menu( item_location locThisItem,
                     break;
                 case 'v':
                     if( oThisItem.is_container() ) {
+                        ui_impl.reset();
                         oThisItem.favorite_settings_menu();
                     }
                     break;
                 case 'V': {
+                    ui_impl.reset();
                     view_recipe_crafting_menu( oThisItem );
                     break;
                 }
                 case 'i':
                     if( oThisItem.is_container() ) {
+                        ui_impl.reset();
                         game_menus::inv::insert_items( locThisItem );
                     }
                     break;
                 case 'o':
                     if( oThisItem.is_container() && oThisItem.num_item_stacks() > 0 ) {
+                        ui_impl.reset();
                         game_menus::inv::common( locThisItem );
                     }
                     break;
