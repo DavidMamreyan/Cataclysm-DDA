@@ -301,7 +301,9 @@ class uilist // NOLINT(cata-xy)
         // initialize the window or reposition it after screen size change.
         void reposition();
         bool scrollby( int scrollby );
-        void query( bool loop = true, int timeout = 50, bool allow_unfiltered_hotkeys = false );
+        // construct a uilist_impl and loop to query input
+        shared_ptr_fast<uilist_impl> query( bool loop = true, int timeout = 50,
+                                            bool allow_unfiltered_hotkeys = false );
         void filterlist();
         // In add_entry/add_entry_desc/add_entry_col, int k only support letters
         // (a-z, A-Z) and digits (0-9), MENU_AUTOASSIGN, and 0 or ' ' (disable
@@ -496,9 +498,6 @@ class uilist // NOLINT(cata-xy)
         bool recalc_start = false;
         bool clicked = false;
         bool need_to_scroll = false;
-#if defined(TILES)
-        bool hide_ui = false;
-#endif
         std::vector<std::pair<std::string, std::string>> categories;
         std::function<bool( const uilist_entry &, const std::string & )> category_filter;
         size_t current_category = 0;

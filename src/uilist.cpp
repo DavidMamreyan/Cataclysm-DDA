@@ -38,6 +38,7 @@
 
 class uilist_impl : cataimgui::window
 {
+        friend class uilist;
         uilist &parent;
     public:
         explicit uilist_impl( uilist &parent ) : cataimgui::window( "UILIST",
@@ -73,10 +74,7 @@ class uilist_impl : cataimgui::window
 void uilist_impl::draw_controls()
 {
 #if defined(TILES)
-    if( parent.hide_ui ) {
-        ImGuiWindow *w = ImGui::GetCurrentWindowRead();
-        ImGui::SetWindowHiddenAndSkipItemsForCurrentFrame( w );
-    }
+    hide_if_hidden();
     using cata::options::mouse;
     bool cursor_shown = SDL_ShowCursor( SDL_QUERY ) == SDL_ENABLE;
     if( mouse.hidekb && !cursor_shown ) {
@@ -891,7 +889,8 @@ shared_ptr_fast<uilist_impl> uilist::create_or_get_ui()
  * Handle input and update display
  *
  */
-void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
+shared_ptr_fast<uilist_impl> uilist::query( bool loop, int timeout,
+        bool allow_unfiltered_hotkeys )
 {
 #if defined(__ANDROID__)
     if( get_option<bool>( "ANDROID_NATIVE_UI" ) && !entries.empty() && !desired_bounds &&
@@ -955,13 +954,13 @@ void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
         } else {
             ret = UILIST_ERROR;
         }
-        return;
+        return nullptr;
     }
 #endif
     ret_evt = input_event();
     if( entries.empty() ) {
         ret = UILIST_ERROR;
-        return;
+        return nullptr;
     }
     ret = UILIST_WAIT_INPUT;
 
@@ -1058,16 +1057,17 @@ void uilist::query( bool loop, int timeout, bool allow_unfiltered_hotkeys )
             }
         }
     } while( loop && ret == UILIST_WAIT_INPUT );
+
+    return ui;
 }
 
 ///@}
 #if defined(TILES)
-void uilist::set_hide( const bool val )
+void uilist::set_hide( bool val )
 {
-    hide_ui = val;
+    create_or_get_ui()->hide_ui = val;
 }
 #endif
-
 /**
  * cleanup
  */
