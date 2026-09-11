@@ -90,6 +90,7 @@
 enum class cube_direction : int;
 
 static const activity_id ACT_TRAVELLING( "ACT_TRAVELLING" );
+static const activity_id ACT_AUTODRIVE( "ACT_AUTODRIVE" );
 
 static const mongroup_id GROUP_FOREST( "GROUP_FOREST" );
 static const mongroup_id GROUP_NEMESIS( "GROUP_NEMESIS" );
@@ -608,10 +609,8 @@ static void draw_ascii( const catacurses::window &w, overmap_draw_data_t &data )
 
     std::vector<std::pair<nc_color, std::string>> corner_text;
 
-    if( data.fast_traveling ) {
-        tripoint_abs_omt &next_path = player_character.omt_path.back();
-        data.cursor_pos = next_path;
-        oter_opts.center = next_path;
+    if( data.fast_traveling && !player_character.omt_path.empty() ) {
+        oter_opts.center = data.cursor_pos;
         blink = true;
         corner_text.emplace_back( c_yellow, _( "FAST TRAVELING" ) );
     }
@@ -1254,6 +1253,10 @@ tiles_redraw_info redraw_info;
 static void draw( overmap_draw_data_t &data )
 {
     cata_assert( static_cast<bool>( data.ui ) );
+    avatar &player_character = get_avatar();
+    if( data.fast_traveling && !player_character.omt_path.empty() ) {
+        data.cursor_pos = player_character.omt_path.back();
+    }
     ui_adaptor *ui = data.ui.get();
     draw_om_sidebar( *ui, g->w_omlegend, data.ictxt, data );
 #if defined( TILES )
@@ -1993,6 +1996,44 @@ static bool try_travel_to_destination( avatar &player_character, const tripoint_
     return false;
 }
 
+static bool is_traveling( const avatar &player_character )
+{
+    const bool travel_activity = player_character.activity &&
+                                 ( player_character.activity.id() == ACT_TRAVELLING ||
+                                   player_character.activity.id() == ACT_AUTODRIVE );
+    return !player_character.omt_path.empty() &&
+           ( player_character.has_distant_destination() || travel_activity );
+}
+
+static std::shared_ptr<ui_adaptor> create_ui_adaptor()
+{
+    std::shared_ptr<ui_adaptor> ui = std::make_shared<ui_adaptor>();
+
+    ui->on_screen_resize( []( ui_adaptor & ui ) {
+        /**
+         * Handle possibly different overmap font size
+         */
+        OVERMAP_LEGEND_WIDTH = clamp( TERMX / 5, 28, 55 );
+        OVERMAP_WINDOW_HEIGHT = TERMY;
+        OVERMAP_WINDOW_WIDTH = TERMX - OVERMAP_LEGEND_WIDTH;
+        OVERMAP_WINDOW_TERM_WIDTH = OVERMAP_WINDOW_WIDTH;
+        OVERMAP_WINDOW_TERM_HEIGHT = OVERMAP_WINDOW_HEIGHT;
+
+        to_overmap_font_dimension( OVERMAP_WINDOW_WIDTH, OVERMAP_WINDOW_HEIGHT );
+
+        g->w_omlegend = catacurses::newwin( OVERMAP_WINDOW_TERM_HEIGHT, OVERMAP_LEGEND_WIDTH,
+                                            point( OVERMAP_WINDOW_TERM_WIDTH, 0 ) );
+        g->w_overmap = catacurses::newwin( OVERMAP_WINDOW_HEIGHT, OVERMAP_WINDOW_WIDTH, point::zero );
+
+        ui.position_from_window( catacurses::stdscr );
+    } );
+    ui->mark_resize();
+    ui->on_redraw( []( ui_adaptor & ) {
+        draw( g->overmap_data );
+    } );
+    return ui;
+}
+
 static tripoint_abs_omt display()
 {
     // HACK: Remove saved land use code uistate for people who might have accidentally turned it on previously, before it was debug-only
@@ -2019,28 +2060,8 @@ static tripoint_abs_omt display()
 
     background_pane bg_pane;
 
-    data.ui = std::make_shared<ui_adaptor>();
+    data.ui = create_ui_adaptor();
     std::shared_ptr<ui_adaptor> ui = data.ui;
-
-    ui->on_screen_resize( []( ui_adaptor & ui ) {
-        /**
-         * Handle possibly different overmap font size
-         */
-        OVERMAP_LEGEND_WIDTH = clamp( TERMX / 5, 28, 55 );
-        OVERMAP_WINDOW_HEIGHT = TERMY;
-        OVERMAP_WINDOW_WIDTH = TERMX - OVERMAP_LEGEND_WIDTH;
-        OVERMAP_WINDOW_TERM_WIDTH = OVERMAP_WINDOW_WIDTH;
-        OVERMAP_WINDOW_TERM_HEIGHT = OVERMAP_WINDOW_HEIGHT;
-
-        to_overmap_font_dimension( OVERMAP_WINDOW_WIDTH, OVERMAP_WINDOW_HEIGHT );
-
-        g->w_omlegend = catacurses::newwin( OVERMAP_WINDOW_TERM_HEIGHT, OVERMAP_LEGEND_WIDTH,
-                                            point( OVERMAP_WINDOW_TERM_WIDTH, 0 ) );
-        g->w_overmap = catacurses::newwin( OVERMAP_WINDOW_HEIGHT, OVERMAP_WINDOW_WIDTH, point::zero );
-
-        ui.position_from_window( catacurses::stdscr );
-    } );
-    ui->mark_resize();
 
     tripoint_abs_omt ret = tripoint_abs_omt::invalid;
     data.cursor_pos = data.origin_pos;
@@ -2105,11 +2126,6 @@ static tripoint_abs_omt display()
     auto display_path_iter = display_path.rbegin();
     std::chrono::milliseconds cursor_advance_time = std::chrono::milliseconds( 0 );
     bool keep_overmap_ui = false;
-
-    ui->on_redraw( [&]( ui_adaptor & ui ) {
-        ( void )ui;
-        draw( g->overmap_data );
-    } );
 
     do {
         ui_manager::redraw();
@@ -2319,7 +2335,7 @@ static tripoint_abs_omt display()
             last_blink = now;
         }
     } while( action != "QUIT" && action != "CONFIRM" );
-    if( !keep_overmap_ui ) {
+    if( !keep_overmap_ui || !is_traveling( get_avatar() ) ) {
         ui::omap::force_quit();
     } else {
         data.fast_traveling = true;
@@ -2808,6 +2824,32 @@ void ui::omap::path_mark(
             }
         }
     }
+}
+
+bool ui::omap::toggle_travel_view()
+{
+    avatar &player_character = get_avatar();
+    if( !overmap_ui::is_traveling( player_character ) ) {
+        return false;
+    }
+
+    overmap_ui::overmap_draw_data_t &data = g->overmap_data;
+    if( data.ui ) {
+        data.ui.reset();
+        g->invalidate_main_ui_adaptor();
+        return true;
+    }
+
+    if( !data.fast_traveling ) {
+        data = overmap_ui::overmap_draw_data_t();
+        data.fast_traveling = true;
+    }
+    data.origin_pos = player_character.pos_abs_omt();
+    data.cursor_pos = data.origin_pos;
+    g->wait_popup_reset();
+    data.ui = overmap_ui::create_ui_adaptor();
+    data.ui->invalidate_ui();
+    return true;
 }
 
 void ui::omap::force_quit()

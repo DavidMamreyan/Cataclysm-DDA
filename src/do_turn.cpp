@@ -249,6 +249,8 @@ void handle_key_blocking_activity()
         } else if( action == "zoom_out" ) {
             g->zoom_out();
             g->mark_main_ui_adaptor_resize();
+        } else if( action == "map" ) {
+            refresh = ui::omap::toggle_travel_view();
         } else if( action == "player_data" ) {
             u.disp_info( true );
         } else if( action == "messages" ) {
@@ -257,6 +259,10 @@ void handle_key_blocking_activity()
             get_help().display_help();
         } else if( action != "HELP_KEYBINDINGS" ) {
             refresh = false;
+        }
+        if( g->overmap_data.ui ) {
+            g->overmap_data.ui->invalidate_ui();
+            refresh = true;
         }
         if( refresh ) {
             ui_manager::redraw();

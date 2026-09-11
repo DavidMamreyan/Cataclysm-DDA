@@ -117,6 +117,9 @@ void path_mark(
     const std::vector<tripoint_abs_omt> &note_pts, bool add_notes = true,
     const std::string &message = "R;X: PATH" );
 
+/** Toggle between the overmap and local views during overmap auto-travel. */
+bool toggle_travel_view();
+
 void force_quit();
 } // namespace omap
 

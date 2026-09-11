@@ -676,7 +676,9 @@ void autodrive_activity_actor::canceled( player_activity &act, Character &who )
     if( player_vehicle ) {
         player_vehicle->stop_autodriving( false );
     }
-    ui::omap::force_quit();
+    if( who.is_avatar() ) {
+        ui::omap::force_quit();
+    }
     act.set_to_null();
 }
 
@@ -684,7 +686,9 @@ void autodrive_activity_actor::finish( player_activity &act, Character &who )
 {
     who.add_msg_if_player( m_info, _( "You have reached your destination." ) );
     player_vehicle->stop_autodriving( false );
-    ui::omap::force_quit();
+    if( who.is_avatar() ) {
+        ui::omap::force_quit();
+    }
     act.set_to_null();
 }
 
