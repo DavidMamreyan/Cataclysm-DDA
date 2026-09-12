@@ -188,7 +188,7 @@ void veh_app_interact::init_ui_windows( map &here )
     if( !has_battery_in_grid( here, veh ) ) {
         height_info++;
     }
-    if( !veh->batteries.empty() ) {
+    if( has_battery_in_grid( here, veh ) ) {
         height_info++;
     }
     if( !veh->reactors.empty() ) {
@@ -245,15 +245,15 @@ void veh_app_interact::draw_info( map &here )
     veh->print_fuel_indicators( here, w_info, point( 0, row ), 0, true, true, true, true );
     row += veh->get_printable_fuel_types( here ).size();
 
-    // Onboard battery power
-    if( !veh->batteries.empty() ) {
-        std::pair<int, int> battery = veh->battery_power_level( );
+    // Grid battery power
+    if( has_battery_in_grid( here, veh ) ) {
+        std::pair<int, int> battery = veh->connected_battery_power_level( here );
         nc_color batt_col = c_yellow;
         if( battery.second > 0 ) {
             batt_col = battery.first == 0 ? c_light_red :
                        battery.first == battery.second ? c_light_green : c_yellow;
         }
-        mvwprintz( w_info, point( 0, row ), c_white, _( "Onboard battery power: " ) );
+        mvwprintz( w_info, point( 0, row ), c_white, _( "Grid battery power: " ) );
         wprintz( w_info, batt_col, string_format( "%d/%d", battery.first, battery.second ) );
         row++;
     }
