@@ -9,6 +9,7 @@
 #include "character.h"
 #include "coordinates.h"
 #include "debug.h"
+#include "enums.h"
 #include "item.h"
 #include "map.h"
 #include "map_helpers.h"
@@ -16,6 +17,7 @@
 #include "point.h"
 #include "type_id.h"
 #include "units.h"
+#include "veh_appliance.h"
 #include "vehicle.h"
 #include "vpart_position.h"
 #include "weather_type.h"
@@ -23,8 +25,14 @@
 static const efftype_id effect_blind( "blind" );
 
 static const itype_id fuel_type_battery( "battery" );
+static const itype_id itype_electric_lantern( "electric_lantern" );
+static const itype_id itype_test_power_cord( "test_power_cord" );
 static const itype_id itype_test_power_cord_25_loss( "test_power_cord_25_loss" );
+static const itype_id itype_test_standing_lamp( "test_standing_lamp" );
+static const itype_id itype_test_storage_battery( "test_storage_battery" );
 
+static const vpart_id vpart_ap_test_standing_lamp( "ap_test_standing_lamp" );
+static const vpart_id vpart_ap_test_storage_battery( "ap_test_storage_battery" );
 static const vpart_id vpart_frame( "frame" );
 static const vpart_id vpart_small_storage_battery( "small_storage_battery" );
 
@@ -138,6 +146,46 @@ TEST_CASE( "power_loss_to_cables", "[vehicle][power]" )
         const int deficit = v.discharge_battery( here, preset.discharge );
         CHECK( deficit >= preset.min_discharge_deficit );
     }
+}
+
+TEST_CASE( "linked_item_charges_from_connected_power_grid", "[vehicle][power][item]" )
+{
+    clear_vehicles();
+    reset_player();
+    build_test_map( ter_id( "t_pavement" ) );
+    map &here = get_map();
+    Character &player_character = get_player_character();
+
+    const tripoint_bub_ms battery_pos{ 4, 10, 0 };
+    const tripoint_bub_ms appliance_pos{ 6, 10, 0 };
+    place_appliance( here, battery_pos, vpart_ap_test_storage_battery, player_character,
+                     item( itype_test_storage_battery ) );
+    place_appliance( here, appliance_pos, vpart_ap_test_standing_lamp, player_character,
+                     item( itype_test_standing_lamp ) );
+
+    const optional_vpart_position battery_vp = here.veh_at( battery_pos );
+    const optional_vpart_position appliance_vp = here.veh_at( appliance_pos );
+    REQUIRE( battery_vp );
+    REQUIRE( appliance_vp );
+    REQUIRE( &battery_vp->vehicle() != &appliance_vp->vehicle() );
+
+    item power_cord( itype_test_power_cord );
+    REQUIRE( power_cord.link_to( battery_vp, appliance_vp, link_state::vehicle_port ).success() );
+
+    vehicle &appliance_grid = appliance_vp->vehicle();
+    REQUIRE( appliance_grid.battery_power_level().first == 0 );
+    REQUIRE( appliance_grid.connected_battery_power_level( here ).first > 0 );
+
+    item linked_tool( itype_electric_lantern );
+    linked_tool.ammo_set( fuel_type_battery, 0 );
+    REQUIRE( linked_tool.is_battery() );
+    REQUIRE( linked_tool.link_to( appliance_vp, link_state::automatic ).success() );
+    const int grid_charge_before = appliance_grid.connected_battery_power_level( here ).first;
+
+    linked_tool.charge_linked_batteries( appliance_grid, 100 );
+
+    CHECK( linked_tool.ammo_remaining() > 0 );
+    CHECK( appliance_grid.connected_battery_power_level( here ).first < grid_charge_before );
 }
 
 TEST_CASE( "Solar_power", "[vehicle][power]" )
